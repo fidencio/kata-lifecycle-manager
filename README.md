@@ -14,13 +14,15 @@ node-by-node upgrades of kata-deploy with verification and automatic rollback on
 
 ## Installation
 
-```bash
-# From OCI registry (when published)
-helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager
+Install the chart from the OCI registry (published on [GitHub Releases](https://github.com/kata-containers/lifecycle-manager/releases)):
 
-# From local source
-helm install kata-lifecycle-manager .
+```bash
+# Install latest (or pin a version with --version v3.27.0)
+helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo
 ```
+
+For development from a local clone: `helm install kata-lifecycle-manager . --namespace argo`
 
 ## Verification Pod (Required)
 
@@ -32,7 +34,8 @@ will fail to install without one.
 Provide the verification pod when installing the chart:
 
 ```bash
-helm install kata-lifecycle-manager . \
+helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo \
   --set-file defaults.verificationPod=./my-verification-pod.yaml
 ```
 
@@ -231,7 +234,8 @@ maintenance operation, or if your organization's operational policies require it
 
 ```bash
 # Enable drain when installing the chart
-helm install kata-lifecycle-manager . \
+helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo \
   --set defaults.drainEnabled=true \
   --set defaults.drainTimeout=600s \
   --set-file defaults.verificationPod=./my-verification-pod.yaml
@@ -315,8 +319,9 @@ to get upgrade orchestration:
 helm install kata-deploy oci://ghcr.io/kata-containers/kata-deploy-charts/kata-deploy \
   --namespace kube-system
 
-# Install upgrade tooling with your verification config
+# Install kata-lifecycle-manager from the published chart (see GitHub Releases)
 helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo \
   --set-file defaults.verificationPod=./my-verification-pod.yaml
 
 # Trigger upgrade
@@ -325,6 +330,28 @@ argo submit -n argo --from workflowtemplate/kata-lifecycle-manager \
 ```
 
 **Note:** `target-version` must be **3.27.0 or higher**; the workflow will fail at prerequisites otherwise.
+
+## Testing from a fork
+
+Workflows use the repository owner for GHCR paths so you can test from a fork (e.g. `fidencio/kata-lifecycle-manager`):
+
+1. **Build the workflow image**  
+   In your fork: Actions → "Build workflow image" → "Run workflow".  
+   This pushes `ghcr.io/<your-username>/lifecycle-manager-utils:latest`.
+
+2. **Release the chart (optional)**  
+   Actions → "Release Helm Chart" → "Run workflow", set version (e.g. `0.1.0-dev`).  
+   This pushes the chart to `ghcr.io/<your-username>/kata-lifecycle-manager-charts`.
+
+3. **Install from your fork**
+   ```bash
+   helm install kata-lifecycle-manager \
+     oci://ghcr.io/<your-username>/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+     --version 0.1.0-dev \
+     --set-file defaults.verificationPod=./verification-pod.yaml \
+     --set images.utils=ghcr.io/<your-username>/lifecycle-manager-utils:latest \
+     --namespace argo
+   ```
 
 ## Documentation
 

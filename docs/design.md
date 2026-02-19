@@ -92,8 +92,9 @@ The kata-lifecycle-manager Helm chart provides orchestration via Argo Workflows:
 If your cluster already has Argo Workflows installed:
 
 ```bash
-# Install kata-lifecycle-manager - integrates with your existing Argo installation
+# Install kata-lifecycle-manager from the published chart (GitHub Releases / OCI)
 helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo \
   --set argoNamespace=argo \
   --set-file defaults.verificationPod=./verification-pod.yaml
 
@@ -424,8 +425,9 @@ The workflow requires the following permissions:
 ### Installation
 
 ```bash
-# Install kata-lifecycle-manager with verification config
+# Install kata-lifecycle-manager from the published chart (OCI / GitHub Releases)
 helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo \
   --set-file defaults.verificationPod=/path/to/verification-pod.yaml
 ```
 

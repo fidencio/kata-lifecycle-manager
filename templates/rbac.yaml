@@ -36,6 +36,10 @@ rules:
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Deployments (kata-deploy chart lookup for NFD detection during helm upgrade)
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
   # RuntimeClass operations (kata-deploy creates RuntimeClasses)
   - apiGroups: ["node.k8s.io"]
     resources: ["runtimeclasses"]

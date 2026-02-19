@@ -30,7 +30,7 @@ defaults:
   # The chart will fail to install without one.
   #
   # Provide via:
-  #   helm install kata-lifecycle-manager ... \
+  #   helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager ... \
   #     --set-file defaults.verificationPod=/path/to/your-verification-pod.yaml
   #
   # Or override at workflow submission (base64-encoded):

@@ -146,7 +146,7 @@ spec:
             echo "The upgrade cannot proceed without a verification pod."
             echo ""
             echo "This should not happen if kata-lifecycle-manager was installed correctly."
-            echo "Reinstall with: helm upgrade kata-lifecycle-manager ... --set-file defaults.verificationPod=<path>"
+            echo "Reinstall with: helm upgrade kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager ... --set-file defaults.verificationPod=<path>"
             echo ""
             exit 1
           fi
