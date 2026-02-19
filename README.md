@@ -326,6 +326,28 @@ argo submit -n argo --from workflowtemplate/kata-lifecycle-manager \
 
 **Note:** `target-version` must be **3.27.0 or higher**; the workflow will fail at prerequisites otherwise.
 
+## Testing from a fork
+
+Workflows use the repository owner for GHCR paths so you can test from a fork (e.g. `fidencio/kata-lifecycle-manager`):
+
+1. **Build the workflow image**  
+   In your fork: Actions → "Build workflow image" → "Run workflow".  
+   This pushes `ghcr.io/<your-username>/lifecycle-manager-utils:latest`.
+
+2. **Release the chart (optional)**  
+   Actions → "Release Helm Chart" → "Run workflow", set version (e.g. `0.1.0-dev`).  
+   This pushes the chart to `ghcr.io/<your-username>/kata-lifecycle-manager-charts`.
+
+3. **Install from your fork**
+   ```bash
+   helm install kata-lifecycle-manager \
+     oci://ghcr.io/<your-username>/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+     --version 0.1.0-dev \
+     --set-file defaults.verificationPod=./verification-pod.yaml \
+     --set images.utils=ghcr.io/<your-username>/lifecycle-manager-utils:latest \
+     --namespace argo
+   ```
+
 ## Documentation
 
 - [Design Document](docs/design.md) - Architecture and design decisions
