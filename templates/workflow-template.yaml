@@ -58,6 +58,9 @@ spec:
       - name: drain-timeout
         value: {{ .Values.defaults.drainTimeout | quote }}
         description: "Timeout for node drain"
+      - name: helm-set-values
+        value: {{ .Values.defaults.helmSetValues | quote }}
+        description: "Extra --set values for helm upgrade (comma-separated key=value pairs, e.g. image.repository=myregistry/kata-deploy,image.tag=mytag)"
 
   templates:
     # =========================================================================
@@ -115,6 +118,8 @@ spec:
           TARGET_VERSION="{{`{{workflow.parameters.target-version}}`}}"
           MIN_KATA_VERSION="3.27.0"
 
+          HELM_SET_VALUES="{{`{{workflow.parameters.helm-set-values}}`}}"
+
           echo "=============================================="
           echo "        VALIDATING PREREQUISITES"
           echo "=============================================="
@@ -164,6 +169,10 @@ spec:
             exit 1
           fi
 
+          if [ -n "$HELM_SET_VALUES" ]; then
+            echo "✓ Extra helm --set values: $HELM_SET_VALUES"
+          fi
+
           echo ""
           echo "=============================================="
           echo "        ALL PREREQUISITES PASSED"
@@ -193,12 +202,16 @@ spec:
           NODES_JSON='{{`{{inputs.parameters.nodes-json}}`}}'
           NODE_COUNT={{`{{inputs.parameters.node-count}}`}}
           VERSION="{{`{{workflow.parameters.target-version}}`}}"
+          HELM_SET_VALUES="{{`{{workflow.parameters.helm-set-values}}`}}"
 
           echo "=============================================="
           echo "        KATA CONTAINERS UPGRADE PLAN"
           echo "=============================================="
           echo ""
           echo "Target Version: $VERSION"
+          if [ -n "$HELM_SET_VALUES" ]; then
+            echo "Helm overrides: $HELM_SET_VALUES"
+          fi
           echo "Total Nodes:    $NODE_COUNT"
           echo "Mode:           Sequential (one at a time)"
           echo ""
@@ -540,23 +553,32 @@ spec:
           RELEASE="{{`{{workflow.parameters.helm-release}}`}}"
           NS="{{`{{workflow.parameters.helm-namespace}}`}}"
           CHART="oci://ghcr.io/kata-containers/kata-deploy-charts/kata-deploy"
+          HELM_SET_VALUES="{{`{{workflow.parameters.helm-set-values}}`}}"
 
           echo "=== Helm upgrade (once for all nodes) ==="
           echo "Release: $RELEASE"
           echo "Target version: $VERSION (kata-deploy 3.27.0+ required for OnDelete strategy)"
+          if [ -n "$HELM_SET_VALUES" ]; then
+            echo "Extra --set values: $HELM_SET_VALUES"
+          fi
           echo ""
 
           # upgrade --install: install if missing, upgrade if present.
           # updateStrategy.type=OnDelete is applied by the kata-deploy chart (3.27.0+).
           # verification.pod="" disables kata-deploy's cluster-wide verification
           # (kata-lifecycle-manager does per-node verification).
-          helm upgrade "$RELEASE" "$CHART" \
-            --namespace "$NS" \
-            --install \
-            --version "$VERSION" \
-            --reset-then-reuse-values \
-            --set updateStrategy.type=OnDelete \
-            --set verification.pod=""
+          HELM_ARGS=(
+            --namespace "$NS"
+            --install
+            --version "$VERSION"
+            --reset-then-reuse-values
+            --set updateStrategy.type=OnDelete
+            --set "verification.pod="
+          )
+          if [ -n "$HELM_SET_VALUES" ]; then
+            HELM_ARGS+=(--set "$HELM_SET_VALUES")
+          fi
+          helm upgrade "$RELEASE" "$CHART" "${HELM_ARGS[@]}"
 
           echo ""
           echo "Helm upgrade complete. DaemonSet has updateStrategy=OnDelete; pods will not"

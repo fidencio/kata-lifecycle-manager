@@ -181,6 +181,7 @@ the new version and others have the old version.
 | `defaults.verificationPod` | Pod YAML for verification **(required)** | `""` |
 | `defaults.drainEnabled` | Enable node drain before upgrade | `false` |
 | `defaults.drainTimeout` | Timeout for drain operation | `300s` |
+| `defaults.helmSetValues` | Extra `--set` values for `helm upgrade` (see [Custom Image](#custom-image)) | `""` |
 | `images.utils` | Image with Helm 4 and kubectl (multi-arch) | `ghcr.io/kata-containers/lifecycle-manager-utils:latest` |
 
 ## Workflow Parameters
@@ -199,6 +200,7 @@ When submitting a workflow, you can override:
 | `verification-pod` | Pod YAML with placeholders |
 | `drain-enabled` | Whether to drain nodes before upgrade |
 | `drain-timeout` | Timeout for drain operation |
+| `helm-set-values` | Extra `--set` values for `helm upgrade` (see [Custom Image](#custom-image)) |
 
 ## Deploy Flow
 
@@ -246,6 +248,33 @@ argo submit -n argo --from workflowtemplate/kata-lifecycle-manager \
   -p drain-enabled=true \
   -p drain-timeout=600s
 ```
+
+## Custom Image
+
+By default, the workflow upgrades kata-deploy using the official chart images for the
+specified `target-version`. To deploy from a custom image (e.g., your own registry or
+a custom build), pass extra `--set` values that override the kata-deploy chart's image
+settings.
+
+**At workflow submission (one-off):**
+
+```bash
+argo submit -n argo --from workflowtemplate/kata-lifecycle-manager \
+  -p target-version=3.27.0 \
+  -p helm-set-values="image.repository=myregistry.io/kata-deploy,image.tag=my-custom-tag"
+```
+
+**Baked into the chart (persistent default):**
+
+```bash
+helm install kata-lifecycle-manager oci://ghcr.io/kata-containers/kata-lifecycle-manager-charts/kata-lifecycle-manager \
+  --namespace argo \
+  --set-file defaults.verificationPod=./my-verification-pod.yaml \
+  --set 'defaults.helmSetValues=image.repository=myregistry.io/kata-deploy\,image.tag=my-custom-tag'
+```
+
+The value uses standard Helm `--set` comma-separated syntax (`key1=val1,key2=val2`).
+Any kata-deploy chart value can be overridden this way, not just the image.
 
 ## Rollback
 
