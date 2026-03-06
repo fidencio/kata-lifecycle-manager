@@ -8,13 +8,15 @@ node-by-node upgrades of kata-deploy with verification and automatic rollback on
 ## Prerequisites
 
 - Kubernetes cluster with **kata-deploy installed via Helm** (chart **3.27.0 or higher** required; the workflow uses `helm upgrade --install` and relies on the kata-deploy chart to set DaemonSet `updateStrategy.type=OnDelete`)
-- [Argo Workflows](https://argoproj.github.io/argo-workflows/) v3.4+ installed (not Argo CD)
+- **Argo Workflows** v3.4+ installed **before** installing kata-lifecycle-manager (this chart only installs the `WorkflowTemplate`; it does not install Argo). Installation guide: [Argo Workflows releases](https://github.com/argoproj/argo-workflows/releases/) (not Argo CD)
 - `helm` CLI and `argo` CLI (Argo Workflows CLI, not `argocd`)
 - **Verification pod spec** (see [Verification Pod](#verification-pod-required))
 
 ## Installation
 
-Install the chart from the OCI registry (published on [GitHub Releases](https://github.com/kata-containers/lifecycle-manager/releases)):
+**1. Install Argo Workflows first** (if not already installed). See the [Argo Workflows installation guide](https://github.com/argoproj/argo-workflows/releases/).
+
+**2. Install the chart** from the OCI registry (published on [GitHub Releases](https://github.com/kata-containers/lifecycle-manager/releases)):
 
 ```bash
 # Install latest (or pin a version with --version $version)
