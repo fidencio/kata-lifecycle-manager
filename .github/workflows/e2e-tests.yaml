@@ -1,0 +1,154 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# E2E tests for kata-lifecycle-manager.
+# Runs on self-hosted runners with nested-virt support via kcli.
+
+name: E2E Tests
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: "Kata Containers FROM version (initial install)"
+        required: false
+        default: "3.28.0"
+      to_version:
+        description: "Kata Containers TO version (upgrade target)"
+        required: false
+        default: "3.28.0"
+      to_image:
+        description: "Override upgrade image (empty = default for version)"
+        required: false
+        default: "quay.io/kata-containers/kata-deploy-ci:kata-containers-latest"
+      tc_filter:
+        description: "Test cases to run (e.g. 1,2,3 or all)"
+        required: false
+        default: "all"
+
+concurrency:
+  group: e2e-tests
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: kata-non-coco-x64
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [kata-qemu, kata-qemu-coco-dev]
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify dependencies
+        run: |
+          for cmd in kcli kubectl helm argo ansible-playbook; do
+            command -v "$cmd" || { echo "MISSING: $cmd"; exit 1; }
+          done
+
+      - name: Run E2E tests (${{ matrix.runtime }})
+        working-directory: tests/e2e
+        run: |
+          ./run_tests.sh \
+            --runtime "${{ matrix.runtime }}" \
+            --tc "${{ github.event.inputs.tc_filter || 'all' }}" \
+            --from-version "${{ github.event.inputs.from_version || '3.28.0' }}" \
+            --to-version "${{ github.event.inputs.to_version || '3.28.0' }}" \
+            --to-image "${{ github.event.inputs.to_image || 'quay.io/kata-containers/kata-deploy-ci:kata-containers-latest' }}" \
+            --results-dir "${{ github.workspace }}/results-${{ matrix.runtime }}" \
+            --skip-cluster-delete
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.runtime }}
+          path: results-${{ matrix.runtime }}/
+          retention-days: 30
+
+  report-and-cleanup:
+    runs-on: kata-non-coco-x64
+    needs: [e2e]
+    if: always()
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results/
+
+      - name: Generate combined summary
+        if: always()
+        run: |
+          echo "## E2E Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          for runtime_dir in all-results/results-*/; do
+            runtime=$(basename "$runtime_dir" | sed 's/results-//')
+            echo "### ${runtime}" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+
+            if [ -f "${runtime_dir}/summary.md" ]; then
+              cat "${runtime_dir}/summary.md" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "No results found." >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Publish JUnit results
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: "all-results/results-*/junit.xml"
+          check_name: "E2E Test Results"
+          fail_on_failure: true
+
+      - name: Delete kcli clusters
+        if: always()
+        run: |
+          for cluster in kata-e2e-kata-qemu kata-e2e-kata-qemu-coco-dev; do
+            kcli delete kube -y "$cluster" 2>/dev/null || true
+          done
+
+      - name: Rotate old results on disk
+        if: always()
+        working-directory: tests/e2e
+        run: |
+          ./run_tests.sh --rotate-logs-only
+
+      - name: Prune journal logs
+        if: always()
+        run: |
+          sudo journalctl --vacuum-time=7d --vacuum-size=1G 2>/dev/null || true
+
+      - name: Final verdict
+        if: always()
+        run: |
+          TOTAL_FAILED=0
+          for results_file in all-results/results-*/results.json; do
+            if [ -f "$results_file" ]; then
+              FAILED=$(python3 -c "
+          import json
+          with open('${results_file}') as f:
+              print(sum(1 for r in json.load(f) if r['status'] == 'FAILED'))
+          " 2>/dev/null || echo "0")
+              TOTAL_FAILED=$((TOTAL_FAILED + FAILED))
+            fi
+          done
+
+          if [ "$TOTAL_FAILED" -gt 0 ]; then
+            echo "[FAIL] ${TOTAL_FAILED} test(s) failed across all runtimes"
+            exit 1
+          fi
+          echo "[PASS] All tests passed across all runtimes"

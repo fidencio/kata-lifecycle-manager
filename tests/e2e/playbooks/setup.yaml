@@ -1,0 +1,16 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Full cluster setup: create kcli cluster, install Argo, kata-deploy, lifecycle-manager.
+---
+- name: Setup cluster and prerequisites
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: cluster
+      vars:
+        cluster_action: create
+      when: not (skip_cluster_create | default(false) | bool)
+    - role: argo
+    - role: kata_deploy
+    - role: lifecycle_manager

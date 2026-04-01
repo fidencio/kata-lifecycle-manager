@@ -1,0 +1,12 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Wait for the latest argo workflow to complete (succeed or fail).
+---
+- name: Wait for workflow to finish
+  ansible.builtin.command:
+    cmd: argo wait @latest -n {{ argo_namespace }}
+  register: workflow_wait_result
+  changed_when: false
+  failed_when: false
+  timeout: "{{ workflow_timeout }}"

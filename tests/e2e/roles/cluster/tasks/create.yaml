@@ -1,0 +1,69 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Create kcli kubeadm cluster
+  ansible.builtin.command:
+    cmd: >-
+      kcli create kube kubeadm
+      --ctlplanes {{ cluster_ctlplanes }}
+      --workers {{ cluster_workers }}
+      -P image={{ cluster_image }}
+      -P memory={{ cluster_memory }}
+      -P numcpus={{ cluster_cpus }}
+      -P disk_size={{ cluster_disk }}
+      -P nested=true
+      {{ cluster_name }}
+  register: kcli_create
+  changed_when: kcli_create.rc == 0
+
+- name: Export kubeconfig from kcli
+  ansible.builtin.shell:
+    cmd: >-
+      kcli list kube -o yaml | grep -A1 "{{ cluster_name }}" | grep kubeconfig | awk '{print $2}'
+  register: kubeconfig_path
+  changed_when: false
+
+- name: Set KUBECONFIG environment variable
+  ansible.builtin.set_fact:
+    kubeconfig_file: "{{ kubeconfig_path.stdout | trim }}"
+
+- name: Wait for all nodes to be Ready
+  ansible.builtin.shell:
+    cmd: >-
+      kubectl --kubeconfig {{ kubeconfig_file }}
+      wait --for=condition=Ready node --all --timeout={{ cluster_create_timeout }}s
+  changed_when: false
+
+- name: Discover control plane node
+  ansible.builtin.shell:
+    cmd: >-
+      kubectl --kubeconfig {{ kubeconfig_file }}
+      get nodes -l node-role.kubernetes.io/control-plane
+      -o jsonpath='{.items[0].metadata.name}'
+  register: cp_node
+  changed_when: false
+
+- name: Discover worker nodes
+  ansible.builtin.shell:
+    cmd: >-
+      kubectl --kubeconfig {{ kubeconfig_file }}
+      get nodes --no-headers
+      -l '!node-role.kubernetes.io/control-plane'
+      -o jsonpath='{.items[*].metadata.name}'
+  register: worker_nodes
+  changed_when: false
+
+- name: Set node name facts
+  ansible.builtin.set_fact:
+    control_plane_node: "{{ cp_node.stdout | trim }}"
+    worker_node_a: "{{ (worker_nodes.stdout.split())[0] }}"
+    worker_node_b: "{{ (worker_nodes.stdout.split())[1] }}"
+
+- name: Display cluster info
+  ansible.builtin.debug:
+    msg: >-
+      Cluster {{ cluster_name }} ready.
+      Control plane: {{ control_plane_node }},
+      Worker A: {{ worker_node_a }},
+      Worker B: {{ worker_node_b }},
+      KUBECONFIG: {{ kubeconfig_file }}

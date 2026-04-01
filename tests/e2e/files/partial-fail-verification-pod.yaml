@@ -1,0 +1,29 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Verification pod that fails on nodes labeled test-role=fail.
+# Used by TC-14 to simulate partial failure: node-A succeeds, node-B fails.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${TEST_POD}
+spec:
+  runtimeClassName: kata-qemu
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: ${NODE}
+  tolerations:
+    - operator: Exists
+  containers:
+    - name: verify
+      image: quay.io/kata-containers/alpine-bash-curl:latest
+      command:
+        - sh
+        - -c
+        - |
+          echo "Running verification on node: ${NODE}"
+          if kubectl get node "${NODE}" -o jsonpath='{.metadata.labels.test-role}' 2>/dev/null | grep -q "fail"; then
+            echo "VERIFICATION FAILED: node marked for failure"
+            exit 1
+          fi
+          echo "SUCCESS: verification passed"

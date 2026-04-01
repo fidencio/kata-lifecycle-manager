@@ -1,0 +1,12 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Cluster teardown.
+---
+- name: Teardown cluster
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: cluster
+      vars:
+        cluster_action: delete

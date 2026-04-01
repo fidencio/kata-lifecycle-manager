@@ -1,0 +1,20 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Assert that a node has a specific annotation value.
+# Required vars: node_name, annotation_key, expected_value
+---
+- name: Get annotation {{ annotation_key }} from {{ node_name }}
+  ansible.builtin.shell:
+    cmd: >-
+      kubectl get node {{ node_name }}
+      -o jsonpath='{.metadata.annotations.{{ annotation_key }}}'
+  register: _annotation_result
+  changed_when: false
+
+- name: Assert annotation {{ annotation_key }} equals {{ expected_value }}
+  ansible.builtin.assert:
+    that:
+      - _annotation_result.stdout == expected_value
+    fail_msg: "Annotation '{{ annotation_key }}' on {{ node_name }} was '{{ _annotation_result.stdout }}', expected '{{ expected_value }}'"
+    success_msg: "Annotation '{{ annotation_key }}' on {{ node_name }} is '{{ expected_value }}'"

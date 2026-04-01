@@ -1,0 +1,22 @@
+# Copyright (c) 2026 The Kata Containers Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Assert that the latest argo workflow has the expected status.
+# Required vars: expected_status (e.g. "Succeeded", "Failed")
+---
+- name: Get latest workflow status
+  ansible.builtin.command:
+    cmd: argo get @latest -n {{ argo_namespace }} -o json
+  register: _wf_json
+  changed_when: false
+
+- name: Parse workflow phase
+  ansible.builtin.set_fact:
+    _wf_phase: "{{ (_wf_json.stdout | from_json).status.phase }}"
+
+- name: Assert workflow status is {{ expected_status }}
+  ansible.builtin.assert:
+    that:
+      - _wf_phase == expected_status
+    fail_msg: "Workflow status was '{{ _wf_phase }}', expected '{{ expected_status }}'"
+    success_msg: "Workflow status is '{{ expected_status }}'"
